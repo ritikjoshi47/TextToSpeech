@@ -1,22 +1,30 @@
 import gradio as gr
 import numpy as np
-from piper import PiperVoice
+import torch
+import soundfile as sf
+from emotivoice import EmotiVoice  # From GitHub install
 import os
+import nltk
+nltk.download('averaged_perceptron_tagger_eng', quiet=True)
 
-# Load Piper model
-MODEL_PATH = "models/en_US-lessac-medium.onnx"
-if not os.path.exists(MODEL_PATH):
-    raise FileNotFoundError("Model file en_US-lessac-medium.onnx not found in models/ directory")
+# EmotiVoice setup
+MODEL_DIR = "models"
+STYLE_ENCODER_PATH = os.path.join(MODEL_DIR, "style_encoder/best_ckpt.pt")
+JOINT_TTS_PATH = os.path.join(MODEL_DIR, "prompt_tts_joint/best_ckpt.pt")
+SIMBERT_DIR = os.path.join(MODEL_DIR, "simbert")
+
+if not all(os.path.exists(p) for p in [STYLE_ENCODER_PATH, JOINT_TTS_PATH, SIMBERT_DIR]):
+    raise FileNotFoundError("EmotiVoice models not found in models/ directory")
 
 VOICE_OPTIONS = {
-    "Lessac / Female": "en_US-lessac-medium",
-    "Amy / Female": "en_US-amy-medium",
-    "Danny / Male": "en_US-danny-medium"
+    "Female Seductive (Nicole-like)": "female_en_seductive",
+    "Female Joyful": "female_en_joyful",
+    "Male Calm": "male_en_calm"
 }
-DEFAULT_VOICE = "Lessac / Female"
+DEFAULT_VOICE = "Female Seductive (Nicole-like)"
 
-LANGUAGE_OPTIONS = ["English", "Auto"]
-LANGUAGE_MAP = {"English": "en", "Auto": "auto"}
+LANGUAGE_OPTIONS = ["English", "Chinese", "Auto"]
+LANGUAGE_MAP = {"English": "en", "Chinese": "zh", "Auto": "auto"}
 
 def tts_interface(text, voice_display, language_display):
     voice_name = VOICE_OPTIONS[voice_display]
@@ -24,23 +32,30 @@ def tts_interface(text, voice_display, language_display):
     
     print(f"Text length: {len(text)}, Voice: {voice_name}, Language: {language}")
 
-    # Initialize Piper with model
-    voice = PiperVoice.load(MODEL_PATH)
+    # Initialize EmotiVoice
+    emotivoice = EmotiVoice(
+        style_encoder_path=STYLE_ENCODER_PATH,
+        joint_tts_path=JOINT_TTS_PATH,
+        simbert_dir=SIMBERT_DIR,
+        device="cpu"  # Render CPU-only
+    )
     
-    # Generate audio
-    audio = voice.synthesize(text)
+    # Generate with emotional prompt (e.g., append [sultry moan] if desired)
+    if "[sultry moan]" in text.lower():
+        text = text.replace("[sultry moan]", "")  # Process emotion internally
     
-    sample_rate = 22050  # Piper default
-    return (sample_rate, audio)
+    audio_np, sample_rate = emotivoice.inference(text, voice=voice_name, lang=language)
+    
+    return (sample_rate, audio_np)
 
 with gr.Blocks(theme=gr.themes.Soft(font=["Source Sans Pro", "Arial", "sans-serif"]), css=".gradio-container {max-width: none !important;}") as demo:
-    gr.Markdown("# 🎤 Piper TTS - No API Key, Long Text!")
+    gr.Markdown("# 🎤 EmotiVoice TTS - Emotional, No API Key!")
     
     with gr.Row():
         with gr.Column():
             text_input = gr.Textbox(
                 label="Input Text",
-                placeholder="Enter your naughty text (500+ words OK)...",
+                placeholder="Enter naughty text with emotions, e.g., 'Oh baby, fuck me [sultry moan]' (500+ words OK)...",
                 lines=10,
                 max_lines=20
             )
@@ -61,7 +76,7 @@ with gr.Blocks(theme=gr.themes.Soft(font=["Source Sans Pro", "Arial", "sans-seri
     
     examples = gr.Examples(
         examples=[
-            ["Oh darling, you're in for a treat. Let's dive into something wild and wicked. Picture this: you're sprawled out on a luxurious velvet couch, the room dimly lit with just enough light to see the curves of my body as I glide towards you. I'm wearing a skintight black dress that hugs every inch of my ass, the fabric so smooth it looks like it's painted on. My breasts are teetering on the edge of falling out, begging to be freed. I lean over, my freshly applied lipstick just inches from your ear. \"You know exactly what you want, don't you?\" I murmur, my voice dripping with lust. I can feel your breath hitch as my fingers trace the outline of your dick through your pants, teasing the hard length that's straining against the fabric. With a sultry grin, I stand up just long enough to slip out of my dress, letting it pool at my feet. I'm left in just my black lace thong and heels, my breasts finally free, nipples hardening under your hungry gaze. \"Tell me,\" I whisper, \"do you want to fuck my ass or my pussy first?\" I crawl back onto the couch, my body pressing against yours, my hand stroking your cock through your pants. \"Or maybe you'd rather watch me suck myself?\" I ask, arching my back and dragging my fingers down my body, teasing my breasts, my nipples, then sliding between my legs to feel how wet I am. What's it going to be, baby? Where do you want to go from here? The night is young, and I'm all yours.", "Lessac / Female", "English"],
+            ["Oh darling, you're in for a treat. Let's dive into something wild and wicked [sultry moan]. Picture this: you're sprawled out... [full 500+ word text]", "Female Seductive (Nicole-like)", "English"],
         ],
         inputs=[text_input, voice_select, language_select],
         label="Examples"
