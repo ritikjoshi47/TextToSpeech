@@ -3,10 +3,10 @@ import numpy as np
 from piper import PiperVoice
 import os
 
-# Load Piper model (download model file separately)
-MODEL_PATH = "en_US-lessac-medium.onnx"
+# Load Piper model
+MODEL_PATH = "models/en_US-lessac-medium.onnx"
 if not os.path.exists(MODEL_PATH):
-    raise FileNotFoundError("Download en_US-lessac-medium.onnx and place in project directory")
+    raise FileNotFoundError("Model file en_US-lessac-medium.onnx not found in models/ directory")
 
 VOICE_OPTIONS = {
     "Lessac / Female": "en_US-lessac-medium",
@@ -24,7 +24,7 @@ def tts_interface(text, voice_display, language_display):
     
     print(f"Text length: {len(text)}, Voice: {voice_name}, Language: {language}")
 
-    # Initialize Piper
+    # Initialize Piper with model
     voice = PiperVoice.load(MODEL_PATH)
     
     # Generate audio
