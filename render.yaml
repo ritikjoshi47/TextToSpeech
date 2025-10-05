@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: piper-tts
-    env: python
+    name: emotivoice-tts
+    env: python3.10  # Fixes Python 3.12 issues
     buildCommand: pip install -r requirements.txt
     startCommand: python app.py
